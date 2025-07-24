@@ -1,4 +1,6 @@
-import React, { FaInstagram, FaGithub, FaTwitter, FaYoutube } from "react-icons/fa";
+import React from "react";
+import { FaInstagram, FaGithub, FaYoutube } from "react-icons/fa";
+import { SiX } from "react-icons/si"; // Import SiX for the X logo
 
 const Footer = () => {
   return (
@@ -18,16 +20,19 @@ const Footer = () => {
           <a href="/contact" className="hover:text-indigo-400 transition">Contact</a>
           <a href="/terms" className="hover:text-indigo-400 transition">Terms</a>
           <a href="/privacy" className="hover:text-indigo-400 transition">Privacy Policy</a>
+           <a href="/forum" className="hover:text-indigo-400 transition">Forum</a>
+
         </div>
 
         {/* Right: Social Media */}
         <div>
           <h3 className="text-lg font-semibold mb-3">Connect with Us</h3>
           <div className="flex gap-4 text-xl">
-            <a href="#" className="text-pink-500 hover:text-pink-400 transition-colors"><FaInstagram size={26}/></a>
-            <a href="#" className="text-gray-300 hover:text-white transition-colors"><FaGithub size={26}/></a>
-            <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors"><FaTwitter size={26}/></a>
-            <a href="#" className="text-red-600 hover:text-red-500 transition-colors"><FaYoutube size={26}/></a>
+            <a href="https://www.instagram.com/arvind.yadav.07/" target="_blank" className="text-pink-500 hover:text-pink-400 transition-colors"><FaInstagram size={26}/></a>
+            <a href="https://github.com/arvind9018"target="_blank" className="text-gray-300 hover:text-white transition-colors"><FaGithub size={26}/></a>
+            {/* Changed FaTwitter to SiX */}
+            <a href="https://x.com/@Arvind5800" target="_blank" className="text-gray-300 hover:text-white transition-colors" ><SiX size={26}/></a>
+            <a href="#" target="_blank" className="text-red-600 hover:text-red-500 transition-colors"><FaYoutube size={26}/></a>
           </div>
         </div>
       </div>
