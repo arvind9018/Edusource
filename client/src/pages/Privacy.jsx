@@ -2,8 +2,12 @@ import React from "react";
 
 const Privacy = () => {
     return (
-      <div className="min-h-screen bg-gray-50 font-sans text-gray-800 py-16 px-6 sm:px-10 md:px-16">
-        <div className="max-w-5xl mx-auto bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-gray-200">
+      <div className="min-h-screen bg-gray-50 font-sans text-gray-800 py-16 px-6 sm:px-10 md:px-16"
+      style={{
+        background: "linear-gradient(to bottom right, #e3f2fd, #e0f7fa)",
+      }}
+      >
+        <div className="max-w-5xl mx-auto bg-blue-100 p-8 rounded-xl shadow-lg border border-blue-100">
           <header className="text-center mb-12">
             <h1 className="text-4xl sm:text-5xl font-extrabold text-blue-700 leading-tight">
               Privacy Policy
