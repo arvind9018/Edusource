@@ -15,7 +15,7 @@ import SpecializationsPage from "./pages/Specializations/index";
 import SpecializationDetail from "./pages/Specializations/SpecializationDetail";
 import Courses from "./pages/Courses/index";
 import CourseDetail from "./pages/Courses/CourseDetail";
-
+import Forum from './pages/Forum';
 
 import ChatBot from './pages/chatbot/index';
 import AllBlogsPage from './pages/AllBlogsPage';
@@ -68,7 +68,7 @@ const App = () => {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
-
+          <Route path="/forum" element={<Forum />} />
           {/*Chatbot */}
           
           {/* Protected Routes */}
