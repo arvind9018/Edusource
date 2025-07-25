@@ -284,7 +284,7 @@ const HeroPage = () => {
             </section>
 
             {/* 📘 Courses Section */}
-            <section id="courses" className="py-16 px-2 text-center bg-white dark:bg-slate-900">
+            <section id="courses" className="py-16 px-2 text-center bg-blue dark:bg-slate-700">
                 <h2 className="text-2xl sm:text-3xl font-bold mb-10">Top Courses</h2>
                 <div className="max-w-6xl mx-auto">
                     {loading ? (
@@ -312,7 +312,7 @@ const HeroPage = () => {
                     )}
                 </div>
                 <div className="text-center mt-8">
-                    <a href="/courses" className="text-indigo-600 font-medium hover:underline">
+                    <a href="/courses" className="text-indigo-400 font-medium hover:underline">
                         View All Courses
                     </a>
                 </div>
