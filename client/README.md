@@ -1,5 +1,5 @@
 # Vercel Deploy link
-(https://edusource-6em4.vercel.app/)
+(https://edusource.vercel.app/)
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
