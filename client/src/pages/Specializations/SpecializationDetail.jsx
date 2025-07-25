@@ -1,153 +1,166 @@
 // src/pages/Specializations/SpecializationDetail.jsx
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore'; // Removed unnecessary imports
+import { useParams, Link as RouterLink } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Container, Typography, Box, Grid, CircularProgress, Alert } from '@mui/material';
+import {
+  Container, Typography, Box, Grid, CircularProgress, Alert,
+  Breadcrumbs, Link as MuiLink, Paper
+} from '@mui/material';
+import HomeIcon from '@mui/icons-material/Home';
+import SchoolIcon from '@mui/icons-material/School';
 import CourseCard from '../../components/CourseCard';
 import FilterBar from '../../components/FilterBar';
 
 const SpecializationDetail = () => {
-    const { id } = useParams();
-    const [specialization, setSpecialization] = useState(null);
-    const [courses, setCourses] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [filterCategory, setFilterCategory] = useState('All');
-    const [searchKeyword, setSearchKeyword] = useState('');
+  const { id } = useParams();
+  const [specialization, setSpecialization] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [searchKeyword, setSearchKeyword] = useState('');
 
-    useEffect(() => {
-        const fetchSpecializationAndCourses = async () => {
-            setLoading(true);
-            setError('');
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
-            try {
-                const specDocRef = doc(db, 'specializations', id);
-                const specDocSnap = await getDoc(specDocRef);
+  useEffect(() => {
+    const fetchSpecializationAndCourses = async () => {
+      setLoading(true);
+      setError('');
 
-                if (!specDocSnap.exists()) {
-                    setError('Specialization not found.');
-                    setLoading(false);
-                    return;
-                }
-                
-                const specializationData = { id: specDocSnap.id, ...specDocSnap.data() };
-                setSpecialization(specializationData);
-                
-                // FIX: Get courses directly from the 'courses' array in the specialization document
-                let fetchedCourses = specializationData.courses || [];
+      try {
+        const specDocRef = doc(db, 'specializations', id);
+        const specDocSnap = await getDoc(specDocRef);
 
-                // --- Client-side Filtering ---
-                let filteredAndSearchedCourses = fetchedCourses;
+        if (!specDocSnap.exists()) {
+          setError('Specialization not found.');
+          setLoading(false);
+          return;
+        }
 
-                // Apply category filter (assuming courses have a 'category' field)
-                if (filterCategory !== 'All') {
-                    filteredAndSearchedCourses = filteredAndSearchedCourses.filter(course =>
-                        course.category === filterCategory
-                    );
-                }
+        const specializationData = { id: specDocSnap.id, ...specDocSnap.data() };
+        setSpecialization(specializationData);
 
-                // Apply client-side search for keyword
-                if (searchKeyword) {
-                    const lowerCaseKeyword = searchKeyword.toLowerCase();
-                    filteredAndSearchedCourses = filteredAndSearchedCourses.filter(course =>
-                        (course.title && course.title.toLowerCase().includes(lowerCaseKeyword)) ||
-                        (course.shortDescription && course.shortDescription.toLowerCase().includes(lowerCaseKeyword)) ||
-                        (course.tags && course.tags.some(tag => tag.toLowerCase().includes(lowerCaseKeyword)))
-                    );
-                }
+        const courseIds = specializationData.courses || [];
 
-                // Sort courses alphabetically by title
-                filteredAndSearchedCourses.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-
-                setCourses(filteredAndSearchedCourses);
-            } catch (err) {
-                console.error("SpecializationDetail: Error fetching specialization or courses:", err);
-                setError("Failed to load specialization details or courses. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchSpecializationAndCourses();
-    }, [id, filterCategory, searchKeyword]); // Re-run effect when ID or filters change
-
-    if (loading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-                <CircularProgress />
-            </Box>
+        const fullCourseData = await Promise.all(
+          courseIds.map(async (c) => {
+            const courseSnap = await getDoc(doc(db, 'courses', c.id));
+            return { id: courseSnap.id, ...courseSnap.data() };
+          })
         );
-    }
 
-    if (error) {
-        return (
-            <Container sx={{ mt: 8 }}>
-                <Alert severity="error">{error}</Alert>
-            </Container>
-        );
-    }
+        // Apply filtering
+        let filteredCourses = fullCourseData;
 
-    if (!specialization) {
-        return (
-            <Container sx={{ mt: 8 }}>
-                <Typography variant="h5" color="text.secondary" align="center">
-                    Specialization not found.
-                </Typography>
-            </Container>
-        );
-    }
+        if (filterCategory !== 'All') {
+          filteredCourses = filteredCourses.filter(
+            (course) => course.category === filterCategory
+          );
+        }
 
+        if (searchKeyword) {
+          const lowerKeyword = searchKeyword.toLowerCase();
+          filteredCourses = filteredCourses.filter(
+            (course) =>
+              (course.title && course.title.toLowerCase().includes(lowerKeyword)) ||
+              (course.shortDescription && course.shortDescription.toLowerCase().includes(lowerKeyword)) ||
+              (course.tags && course.tags.some(tag => tag.toLowerCase().includes(lowerKeyword)))
+          );
+        }
+
+        filteredCourses.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        setCourses(filteredCourses);
+      } catch (err) {
+        console.error("Error fetching specialization or courses:", err);
+        setError("Failed to load specialization details or courses. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSpecializationAndCourses();
+  }, [id, filterCategory, searchKeyword]);
+
+  if (loading) {
     return (
-        <Container sx={{ mt: 8, mb: 4 }}>
-            <Box sx={{ mb: 4 }}>
-                <Box
-                    sx={{
-                        height: 250,
-                        backgroundImage: `url(${specialization.image || 'https://via.placeholder.com/800x250/34495e/ffffff?text=Specialization+Banner'})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        borderRadius: 2,
-                        mb: 3
-                    }}
-                />
-                <Typography variant="h3" component="h1" gutterBottom sx={{ textAlign: 'center' }}>
-                    {specialization.name}
-                </Typography>
-                <Typography variant="body1" color="text.secondary" paragraph align="center">
-                    {specialization.description}
-                </Typography>
-            </Box>
-
-            <Typography variant="h5" component="h2" gutterBottom sx={{ mt: 6, mb: 3 }}>
-                Courses in this Specialization
-            </Typography>
-
-            <FilterBar
-                filterCategory={filterCategory}
-                setFilterCategory={setFilterCategory}
-                searchKeyword={searchKeyword}
-                setSearchKeyword={setSearchKeyword}
-                categories={['All', 'AI & ML', 'Data Science', 'Web Development', 'Data Structures']} // Example categories
-            />
-
-            {courses.length === 0 ? (
-                <Typography variant="h6" color="text.secondary" align="center" sx={{ mt: 4 }}>
-                    No courses found for this specialization with the current filters.
-                </Typography>
-            ) : (
-                <Grid container spacing={4} sx={{ mt: 3 }}>
-                    {courses.map((course) => (
-                        <Grid item key={course.id} xs={12} sm={6} md={4}>
-                            <Link to={`/courses/${course.id}`} style={{ textDecoration: 'none' }}>
-                                <CourseCard course={course} />
-                            </Link>
-                        </Grid>
-                    ))}
-                </Grid>
-            )}
-        </Container>
+      <Box sx={{
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+        minHeight: '80vh',
+        background: 'linear-gradient(to bottom right, #e0e7ff, #bfdbfe)',
+        py: 4
+      }}>
+        <CircularProgress color="primary" sx={{ mb: 2 }} />
+        <Typography variant="h6" color="text.secondary">Loading Specialization...</Typography>
+      </Box>
     );
+  }
+
+  if (error) {
+    return (
+      <Container sx={{ mt: 8, py: 4, backgroundColor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <Typography variant="body1" align="center" sx={{ mt: 2 }}>
+          Please check the URL or go back to <MuiLink component={RouterLink} to="/specializations">Specializations</MuiLink>.
+        </Typography>
+      </Container>
+    );
+  }
+
+  const availableCategories = ['All', 'Data Science', 'Machine Learning', 'Web Development', 'Mobile Development',
+    'Cloud Computing', 'Cybersecurity', 'Game Development', 'Digital Marketing',
+    'UI/UX Design', 'Artificial Intelligence', 'Networking', 'Database Management'];
+
+  return (
+    <Box sx={{
+      minHeight: '100vh',
+      pt: 4,
+      pb: 6,
+      background: 'linear-gradient(to bottom right, #e0e7ff, #bfdbfe)',
+      px: { xs: 2, sm: 4, md: 6 },
+    }}>
+      <Container maxWidth="lg" sx={{ backgroundColor: 'transparent', boxShadow: 'none', borderRadius: 2 }}>
+        {/* Breadcrumbs could be added here if needed */}
+
+        <Paper class = "bg-blue-100 p-8 rounded-xl shadow-lg border border-blue-500">
+          <Typography variant="h4" component="h2" gutterBottom sx={{ mb: 3, fontWeight: 'bold', color: 'primary.dark' }}>
+            Courses in this Specialization
+          </Typography>
+
+          <FilterBar
+            filterCategory={filterCategory}
+            setFilterCategory={setFilterCategory}
+            searchKeyword={searchKeyword}
+            setSearchKeyword={setSearchKeyword}
+            categories={availableCategories}
+          />
+
+          {courses.length === 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6 }}>
+              <Typography variant="h6" color="text.secondary" align="center" sx={{ mb: 2 }}>
+                No courses found for this specialization with the current filters.
+              </Typography>
+              {(filterCategory !== 'All' || searchKeyword) && (
+                <MuiLink component="button" onClick={() => { setFilterCategory('All'); setSearchKeyword(''); }} sx={{ mt: 1 }}>
+                  Clear all filters
+                </MuiLink>
+              )}
+            </Box>
+          ) : (
+            <Grid container spacing={4} sx={{ mt: 2 }}>
+              {courses.map((course) => (
+                <Grid item key={course.id} xs={12} sm={6} md={4}>
+                  <CourseCard course={course} />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Paper>
+      </Container>
+    </Box>
+  );
 };
 
 export default SpecializationDetail;
