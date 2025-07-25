@@ -17,7 +17,7 @@ const App = () => {
     // API configuration - Reading from environment variables
     // IMPORTANT: Ensure you have a .env file in your React project root with:
     // REACT_APP_CHAT_PROXY_URL=http://localhost:3001/chat
-    const CHAT_PROXY_URL ='https://airy-communication-production-155d.up.railway.app/chat';
+    const CHAT_PROXY_URL ='https://edusource-backend-production-f06d.up.railway.app/chat';
 
     // Scrolls to the bottom of the messages container whenever messages update
     useEffect(() => {
