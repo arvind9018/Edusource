@@ -4,8 +4,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
   signOut,
   sendEmailVerification,
 } from "firebase/auth";
@@ -19,9 +17,6 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [otp, setOtp] = useState("");
-  const [showOtpInput, setShowOtpInput] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
@@ -52,6 +47,31 @@ const Login = () => {
 
   const validateEmail = (email) => /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
 
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(password);
+
+    if (password.length < minLength) {
+      return `Password must be at least ${minLength} characters long.`;
+    }
+    if (!hasUppercase) {
+      return "Password must contain at least one uppercase letter.";
+    }
+    if (!hasLowercase) {
+      return "Password must contain at least one lowercase letter.";
+    }
+    if (!hasNumber) {
+      return "Password must contain at least one number.";
+    }
+    if (!hasSpecialChar) {
+      return "Password must contain at least one special symbol (e.g., !@#$%^&*).";
+    }
+    return null;
+  };
+
   const handleEmailAuth = async (e) => {
     e.preventDefault();
     if (!validateEmail(email)) {
@@ -63,11 +83,21 @@ const Login = () => {
       return;
     }
 
+    if (!isLogin) {
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        displayMessage(passwordError, "error");
+        return;
+      }
+    }
+
     try {
       let userCred;
       if (isLogin) {
+        // --- LOGIN LOGIC ---
         userCred = await signInWithEmailAndPassword(auth, email, password);
 
+        // Check email verification first
         if (!userCred.user.emailVerified) {
           await signOut(auth);
           displayMessage(
@@ -79,41 +109,64 @@ const Login = () => {
 
         const userRef = doc(db, "users", userCred.user.uid);
         const userSnap = await getDoc(userRef);
+        let fetchedRole = "student"; // Default role
+
         if (userSnap.exists()) {
-          const fetchedRole = userSnap.data().role || "student";
-          localStorage.setItem("role", fetchedRole);
+          fetchedRole = userSnap.data().role || "student";
         } else {
-          localStorage.setItem("role", "student");
+          // If no user document, assume student role. This might happen for older users.
+          console.warn("User document not found for existing user. Defaulting role to 'student'.");
         }
-        
-        displayMessage("Login successful!", "success");
+
+        // --- Instructor Verification Check for Login ---
+        if (fetchedRole === 'instructor_pending') {
+            await signOut(auth); // Sign out the user if role is pending
+            displayMessage("Your instructor account is awaiting approval. Please contact support.", "error");
+            return;
+        }
+
+        localStorage.setItem("role", fetchedRole);
         localStorage.setItem("isLoggedIn", "true");
         localStorage.setItem("userEmail", email);
+        displayMessage("Login successful!", "success");
         navigate("/hero-page");
 
       } else {
+        // --- SIGN UP LOGIC ---
         userCred = await createUserWithEmailAndPassword(auth, email, password);
         await sendEmailVerification(userCred.user);
+
+        // Determine the role to save: 'instructor_pending' if currentRole is 'instructor', else 'student'
+        const roleToSave = currentRole === 'instructor' ? 'instructor_pending' : currentRole;
 
         await setDoc(doc(db, "users", userCred.user.uid), {
           name,
           dob,
           email,
-          role: currentRole,
+          role: roleToSave, // Save the determined role
           createdAt: new Date().toISOString(),
         }, { merge: true });
 
-        await signOut(auth);
-        
-        setShowVerificationPopup(true);
+        await signOut(auth); // Sign out user to force email verification login
 
+        // Show appropriate message based on the role they attempted to sign up as
+        if (roleToSave === 'instructor_pending') {
+            displayMessage(
+                "You have successfully signed up as a pending instructor! Your account will be reviewed for approval. An email verification link has also been sent.",
+                "info"
+            );
+        } else {
+            setShowVerificationPopup(true); // Show standard verification popup for students
+        }
+        
         setEmail("");
         setPassword("");
         setName("");
         setDob("");
-        setIsLogin(true);
+        setIsLogin(true); // Switch to login view
       }
     } catch (err) {
+      console.error("Email auth error:", err);
       displayMessage(err.message, "error");
     }
   };
@@ -123,16 +176,26 @@ const Login = () => {
       const result = await signInWithPopup(auth, googleProvider);
       const userRef = doc(db, "users", result.user.uid);
       const userSnap = await getDoc(userRef);
-      let fetchedRole = currentRole;
+      let fetchedRole = currentRole; // Default to currentRole ('student' or selected)
 
       if (userSnap.exists()) {
         fetchedRole = userSnap.data().role || currentRole;
       } else {
+        // Determine the role to save for new Google sign-ups
+        const roleToSave = currentRole === 'instructor' ? 'instructor_pending' : currentRole;
         await setDoc(userRef, {
           email: result.user.email,
           createdAt: new Date().toISOString(),
-          role: currentRole,
+          role: roleToSave, // Save the determined role
         }, { merge: true });
+        fetchedRole = roleToSave; // Set fetchedRole to the role that was saved
+      }
+
+      // --- Instructor Verification Check for Google Login ---
+      if (fetchedRole === 'instructor_pending') {
+          await signOut(auth); // Sign out the user if role is pending
+          displayMessage("Your instructor account is awaiting approval. Please contact support.", "error");
+          return;
       }
 
       localStorage.setItem("isLoggedIn", "true");
@@ -141,51 +204,8 @@ const Login = () => {
       displayMessage("Google login successful!", "success");
       navigate("/hero-page");
     } catch (err) {
+      console.error("Google login error:", err);
       displayMessage(err.message, "error");
-    }
-  };
-
-  const handlePhoneLogin = async () => {
-    try {
-      window.recaptchaVerifier = new RecaptchaVerifier("recaptcha", {
-        size: "invisible",
-        callback: () => {},
-      }, auth);
-
-      const confirmation = await signInWithPhoneNumber(auth, `+91${mobile}`, window.recaptchaVerifier);
-      window.confirmationResult = confirmation;
-      setShowOtpInput(true);
-      displayMessage("OTP sent to your mobile number.", "info");
-    } catch (err) {
-      displayMessage(err.message, "error");
-    }
-  };
-
-  const verifyOtp = async () => {
-    try {
-      const result = await window.confirmationResult.confirm(otp);
-      const userRef = doc(db, "users", result.user.uid);
-      const userSnap = await getDoc(userRef);
-      let fetchedRole = currentRole;
-
-      if (userSnap.exists()) {
-        fetchedRole = userSnap.data().role || currentRole;
-      } else {
-        await setDoc(userRef, {
-          email: result.user.email || null,
-          mobile: mobile,
-          createdAt: new Date().toISOString(),
-          role: currentRole,
-        }, { merge: true });
-      }
-
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("role", fetchedRole);
-      localStorage.setItem("userEmail", result.user.email || mobile);
-      displayMessage("Phone login successful!", "success");
-      navigate("/hero-page");
-    } catch (err) {
-      displayMessage("Invalid OTP", "error");
     }
   };
 
@@ -269,52 +289,19 @@ const Login = () => {
             {isLogin && (
               <>
                 <p className="my-4 text-center font-semibold">OR</p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <div className="w-full sm:w-1/2">
-                    {!showOtpInput ? (
-                      <>
-                        <input
-                          type="text"
-                          placeholder="Mobile Number"
-                          value={mobile}
-                          onChange={(e) => setMobile(e.target.value)}
-                          className="w-full mb-3 px-4 py-2 border rounded"
-                        />
-                        <button
-                          onClick={handlePhoneLogin}
-                          className="w-full bg-orange-500 text-white py-2 rounded-full font-bold hover:bg-orange-600 transition"
-                        >
-                          Send OTP
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          placeholder="Enter OTP"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
-                          className="w-full mb-3 px-4 py-2 border rounded"
-                        />
-                        <button
-                          onClick={verifyOtp}
-                          className="w-full bg-green-600 text-white py-2 rounded-full font-bold hover:bg-green-700 transition"
-                        >
-                          Verify OTP
-                        </button>
-                      </>
-                    )}
-                    <div id="recaptcha"></div>
-                  </div>
-
-                  <div className="w-full sm:w-1/2">
-                    <button
-                      onClick={handleGoogleLogin}
-                      className="w-full bg-red-500 text-white py-2 rounded-full font-bold hover:bg-red-600 transition"
-                    >
-                      Sign in with Google
-                    </button>
-                  </div>
+                <div className="flex justify-center w-full">
+                  <button
+                    onClick={handleGoogleLogin}
+                    className="w-full sm:w-auto bg-white text-gray-700 py-2 px-4 border border-gray-300 rounded-full font-medium shadow-sm hover:bg-gray-50 transition flex items-center justify-center space-x-2"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M22.56 12.25c0-.78-.07-1.55-.2-2.31H12v4.39h6.14a5.11 5.11 0 01-2.23 3.39v2.87h3.69c2.16-2 3.42-4.94 3.42-8.29z" fill="#4285F4"/>
+                      <path d="M12 23c3.07 0 5.65-1.01 7.54-2.74l-3.69-2.87c-1 .73-2.27 1.16-3.85 1.16-2.95 0-5.46-1.99-6.36-4.66H1.67v2.96C3.56 21.01 7.48 23 12 23z" fill="#34A853"/>
+                      <path d="M5.64 14.1c-.27-1.09-.27-2.12 0-3.21V8.04H1.67a10.02 10.02 0 000 7.92L5.64 14.1z" fill="#FBBC04"/>
+                      <path d="M12 4.67c1.67 0 3.12.68 4.16 1.63L19.06 3C17.06 1.14 14.73 0 12 0 7.48 0 3.56 1.99 1.67 5.95l3.97 3.09C6.54 6.66 9.05 4.67 12 4.67z" fill="#EA4335"/>
+                    </svg>
+                    <span>Sign in with Google</span>
+                  </button>
                 </div>
               </>
             )}
