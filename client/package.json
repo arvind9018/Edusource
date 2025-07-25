@@ -7,6 +7,7 @@
     "start1": "npx @tailwindcss/cli -i ./src/index.css -o ./src/dist/output.css --watch"
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@firebase/auth": "^1.10.8",
