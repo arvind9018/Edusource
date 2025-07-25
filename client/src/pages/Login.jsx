@@ -22,6 +22,8 @@ const Login = () => {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [popupAction, setPopupAction] = useState(null);
   const navigate = useNavigate();
 
   const [currentRole, setCurrentRole] = useState(
@@ -100,10 +102,10 @@ const Login = () => {
         // Check email verification first
         if (!userCred.user.emailVerified) {
           await signOut(auth);
-          displayMessage(
-            "Please verify your email address before logging in. A verification link has been sent to your email.",
-            "error"
+          setVerificationMessage(
+            "Please verify your email address before logging in. A verification link has been sent to your email."
           );
+          setShowVerificationPopup(true);
           return;
         }
 
@@ -114,60 +116,68 @@ const Login = () => {
         if (userSnap.exists()) {
           fetchedRole = userSnap.data().role || "student";
         } else {
-          // If no user document, assume student role. This might happen for older users.
           console.warn("User document not found for existing user. Defaulting role to 'student'.");
         }
 
         // --- Instructor Verification Check for Login ---
         if (fetchedRole === 'instructor_pending') {
-            await signOut(auth); // Sign out the user if role is pending
-            displayMessage("Your instructor account is awaiting approval. Please contact support.", "error");
+            await signOut(auth);
+            setVerificationMessage("Your instructor account is pending approval. Please wait for admin approval before logging in.");
+            setShowVerificationPopup(true);
             return;
         }
 
         localStorage.setItem("role", fetchedRole);
         localStorage.setItem("isLoggedIn", "true");
         localStorage.setItem("userEmail", email);
-        displayMessage("Login successful!", "success");
-        navigate("/hero-page");
+        
+        setVerificationMessage(`Login successful! Welcome back as ${fetchedRole}.`);
+        setShowVerificationPopup(true);
 
       } else {
         // --- SIGN UP LOGIC ---
         userCred = await createUserWithEmailAndPassword(auth, email, password);
         await sendEmailVerification(userCred.user);
 
-        // Determine the role to save: 'instructor_pending' if currentRole is 'instructor', else 'student'
         const roleToSave = currentRole === 'instructor' ? 'instructor_pending' : currentRole;
 
         await setDoc(doc(db, "users", userCred.user.uid), {
           name,
           dob,
           email,
-          role: roleToSave, // Save the determined role
+          role: roleToSave,
           createdAt: new Date().toISOString(),
         }, { merge: true });
 
-        await signOut(auth); // Sign out user to force email verification login
+        await signOut(auth);
 
-        // Show appropriate message based on the role they attempted to sign up as
         if (roleToSave === 'instructor_pending') {
-            displayMessage(
-                "You have successfully signed up as a pending instructor! Your account will be reviewed for approval. An email verification link has also been sent.",
-                "info"
+            setVerificationMessage(
+                "Your instructor account is pending approval. You'll be able to login once admin approves your request. A verification email has also been sent."
             );
         } else {
-            setShowVerificationPopup(true); // Show standard verification popup for students
+            setVerificationMessage(
+                "A verification link has been sent to your email address. Please verify your email before logging in."
+            );
         }
         
+        setShowVerificationPopup(true);
         setEmail("");
         setPassword("");
         setName("");
         setDob("");
-        setIsLogin(true); // Switch to login view
+        setIsLogin(true);
       }
     } catch (err) {
       console.error("Email auth error:", err);
-      displayMessage(err.message, "error");
+      
+      if (err.code === 'auth/invalid-credential') {
+        setVerificationMessage("Account not found. Please create an account first.");
+        setPopupAction(() => () => setIsLogin(false));
+        setShowVerificationPopup(true);
+      } else {
+        displayMessage(err.message, "error");
+      }
     }
   };
 
@@ -176,36 +186,47 @@ const Login = () => {
       const result = await signInWithPopup(auth, googleProvider);
       const userRef = doc(db, "users", result.user.uid);
       const userSnap = await getDoc(userRef);
-      let fetchedRole = currentRole; // Default to currentRole ('student' or selected)
+      let fetchedRole = currentRole;
 
       if (userSnap.exists()) {
         fetchedRole = userSnap.data().role || currentRole;
       } else {
-        // Determine the role to save for new Google sign-ups
         const roleToSave = currentRole === 'instructor' ? 'instructor_pending' : currentRole;
         await setDoc(userRef, {
           email: result.user.email,
           createdAt: new Date().toISOString(),
-          role: roleToSave, // Save the determined role
+          role: roleToSave,
         }, { merge: true });
-        fetchedRole = roleToSave; // Set fetchedRole to the role that was saved
+        fetchedRole = roleToSave;
       }
 
-      // --- Instructor Verification Check for Google Login ---
       if (fetchedRole === 'instructor_pending') {
-          await signOut(auth); // Sign out the user if role is pending
-          displayMessage("Your instructor account is awaiting approval. Please contact support.", "error");
+          await signOut(auth);
+          setVerificationMessage("Your instructor account is pending approval. Please wait for admin approval before logging in.");
+          setShowVerificationPopup(true);
           return;
       }
 
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("role", fetchedRole);
       localStorage.setItem("userEmail", result.user.email);
-      displayMessage("Google login successful!", "success");
-      navigate("/hero-page");
+      
+      setVerificationMessage(`Login successful! Welcome back as ${fetchedRole}.`);
+      setShowVerificationPopup(true);
     } catch (err) {
       console.error("Google login error:", err);
       displayMessage(err.message, "error");
+    }
+  };
+
+  const handlePopupClose = () => {
+    setShowVerificationPopup(false);
+    if (popupAction) {
+      popupAction();
+      setPopupAction(null);
+    }
+    if (verificationMessage.includes("successful") || verificationMessage.includes("Welcome back")) {
+      navigate("/hero-page");
     }
   };
 
@@ -318,17 +339,26 @@ const Login = () => {
       {showVerificationPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
           <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full text-center">
-            <h3 className="text-xl font-bold text-green-600 mb-4">
-              Registration Successful!
+            <h3 className="text-xl font-bold mb-4" style={{ 
+              color: verificationMessage.includes("not found") ? "#DC2626" : 
+                     verificationMessage.includes("pending") ? "#F59E0B" : 
+                     "#10B981"
+            }}>
+              {verificationMessage.includes("not found") ? "Account Not Found" :
+               verificationMessage.includes("successful") ? "Success!" :
+               verificationMessage.includes("pending") ? "Pending Approval" :
+               "Verification Required"}
             </h3>
             <p className="text-gray-700 mb-6">
-              A verification link has been sent to your email address. Please click the link to verify your account and then log in.
+              {verificationMessage}
             </p>
             <button
-              onClick={() => setShowVerificationPopup(false)}
+              onClick={handlePopupClose}
               className="w-full bg-blue-600 text-white py-2 rounded-full font-bold hover:bg-blue-700 transition"
             >
-              Got it!
+              {verificationMessage.includes("not found") ? "Go to Sign Up" :
+               verificationMessage.includes("successful") ? "Continue" :
+               "Got it!"}
             </button>
           </div>
         </div>
