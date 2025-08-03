@@ -186,5 +186,4 @@ const RazorpayCheckoutButton = ({ course, onPaymentSuccess }) => {
   );
 };
 
-
 export default RazorpayCheckoutButton;
