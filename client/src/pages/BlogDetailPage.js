@@ -1,188 +1,139 @@
-// src/pages/AllBlogsPage.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, orderBy, limit, startAfter } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Link } from 'react-router-dom';
-import {
-    Box, Typography, CircularProgress, Alert, Grid, Card, CardContent, CardMedia, Button
-} from '@mui/material';
-import { Article as BlogsIcon, CalendarToday as DateIcon, Person as AuthorIcon } from '@mui/icons-material';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase'; // Ensure this path is correct
+import { FaUser, FaCalendarAlt } from 'react-icons/fa';
 
-const BLOGS_PER_PAGE = 8; // Define how many blogs to load per "page"
+// Reusable component for loading spinner
+const LoadingSpinner = () => (
+  <div className="flex justify-center items-center h-screen bg-white dark:bg-slate-900">
+    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-500"></div>
+  </div>
+);
 
-const AllBlogsPage = () => {
-    const [blogs, setBlogs] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [lastDoc, setLastDoc] = useState(null); // State to store the last document for pagination
-    const [hasMore, setHasMore] = useState(true); // State to check if there are more blogs to load
+// Reusable component for error messages
+const ErrorDisplay = ({ message }) => (
+  <div className="flex flex-col justify-center items-center h-screen bg-white dark:bg-slate-900 text-center px-4">
+    <h2 className="text-2xl font-semibold text-red-500">An Error Occurred</h2>
+    <p className="text-slate-600 dark:text-slate-400 mt-2">{message}</p>
+  </div>
+);
 
-    const fetchBlogs = useCallback(async (isInitialFetch = true) => {
-        setLoading(true);
-        setError(null);
 
-        try {
-            let blogsQuery;
-            if (isInitialFetch) {
-                // Initial query: order by creation date, limit to first page
-                blogsQuery = query(
-                    collection(db, 'blogs'),
-                    orderBy('createdAt', 'desc'),
-                    limit(BLOGS_PER_PAGE)
-                );
-                console.log("Fetching initial blogs...");
-            } else {
-                // Subsequent queries: start after the last document fetched, limit
-                if (!lastDoc) { // Should not happen if hasMore is true
-                    setLoading(false);
-                    setHasMore(false);
-                    console.warn("Attempted to load more blogs but lastDoc is null.");
-                    return;
-                }
-                blogsQuery = query(
-                    collection(db, 'blogs'),
-                    orderBy('createdAt', 'desc'),
-                    startAfter(lastDoc), // Start after the last document from previous fetch
-                    limit(BLOGS_PER_PAGE)
-                );
-                console("Loading more blogs...");
-            }
+const BlogDetailPage = () => {
+  const { blogId } = useParams(); // Gets the blog ID from the URL (e.g., /blogs/xyz)
+  const navigate = useNavigate();
+  const [blog, setBlog] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-            const querySnapshot = await getDocs(blogsQuery);
-            const fetchedBlogs = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+  useEffect(() => {
+    // Function to fetch a single blog post from Firestore
+    const fetchBlog = async () => {
+      if (!blogId) {
+        setError("No blog ID provided.");
+        setLoading(false);
+        return;
+      }
 
-            if (isInitialFetch) {
-                setBlogs(fetchedBlogs);
-            } else {
-                setBlogs(prevBlogs => [...prevBlogs, ...fetchedBlogs]); // Append new blogs
-            }
+      setLoading(true);
+      try {
+        const docRef = doc(db, 'blogs', blogId); // Create a reference to the specific blog document
+        const docSnap = await getDoc(docRef);
 
-            // Check if there are more documents than the limit, to determine `hasMore`
-            if (fetchedBlogs.length < BLOGS_PER_PAGE) {
-                setHasMore(false); // No more blogs to load
-                console.log("No more blogs to load.");
-            } else {
-                setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]); // Set the last document
-                setHasMore(true);
-                console.log("More blogs available. Last document set.");
-            }
-
-        } catch (err) {
-            console.error("Error fetching blogs:", err);
-            setError("Failed to load blog posts. Please try again later.");
-            setHasMore(false); // Stop trying to load more on error
-        } finally {
-            setLoading(false);
+        if (docSnap.exists()) {
+          // If the document exists, set it in state
+          setBlog({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          // If no document is found, set an error
+          setError("Sorry, we couldn't find that blog post.");
         }
-    }, [lastDoc]); // lastDoc is a dependency for subsequent fetches
-
-    useEffect(() => {
-        // Initial fetch when component mounts
-        fetchBlogs(true);
-    }, [fetchBlogs]); // fetchBlogs is a dependency
-
-    // Helper function to format the date (copied from BlogDetailPage)
-    const formatDate = (isoString) => {
-        if (!isoString) return 'Date not available';
-        return new Date(isoString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
+      } catch (err) {
+        console.error("Error fetching blog post:", err);
+        setError("There was a problem loading the content. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    return (
-        <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3, mt: 4, mb: 4 }}>
-            <Typography variant="h3" gutterBottom align="center" sx={{ fontWeight: 'bold', mb: 4, color: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BlogsIcon sx={{ fontSize: '3rem', mr: 1 }} /> All Blog Posts
-            </Typography>
+    fetchBlog();
+  }, [blogId]); // Re-run this effect if the blogId changes
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>
+  // Helper function to format the date
+  const formatDate = (isoString) => {
+    if (!isoString) return 'Date not available';
+    return new Date(isoString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return <ErrorDisplay message={error} />;
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-900 min-h-screen text-slate-800 dark:text-slate-200">
+      <main className="max-w-4xl mx-auto py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+        {blog && (
+          <article>
+            {/* Header section with title and metadata */}
+            <header className="mb-8 text-center border-b border-slate-200 dark:border-slate-700 pb-8">
+              <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
+                {blog.title}
+              </h1>
+              <div className="flex justify-center items-center space-x-6 text-sm text-slate-500 dark:text-slate-400">
+                <div className="flex items-center space-x-2">
+                  <FaUser />
+                  <span>{blog.authorName || 'Anonymous'}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <FaCalendarAlt />
+                  <time dateTime={blog.createdAt}>{formatDate(blog.createdAt)}</time>
+                </div>
+              </div>
+            </header>
+
+            {/* Banner Image */}
+            {blog.imageUrl && (
+              <div className="mb-8 rounded-lg overflow-hidden shadow-lg">
+                <img
+                  src={blog.imageUrl}
+                  alt={blog.title}
+                  className="w-full h-auto max-h-[500px] object-cover"
+                  onError={(e) => { e.target.style.display = 'none'; }} // Hide image on error
+                />
+              </div>
             )}
 
-            <Grid container spacing={4}>
-                {blogs.length === 0 && !loading ? (
-                    <Grid item xs={12}>
-                        <Alert severity="info" sx={{ textAlign: 'center' }}>No blog posts available at the moment.</Alert>
-                    </Grid>
-                ) : (
-                    blogs.map((blog) => (
-                        <Grid item key={blog.id} xs={12} sm={6} md={4} lg={3}> {/* Responsive grid for cards */}
-                            <Card
-                                component={Link}
-                                to={`/blogs/${blog.id}`}
-                                sx={{
-                                    height: '100%',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    textDecoration: 'none',
-                                    '&:hover': {
-                                        boxShadow: 6,
-                                        transform: 'translateY(-5px)',
-                                    },
-                                    transition: '0.3s',
-                                    borderRadius: 2,
-                                    overflow: 'hidden',
-                                    boxShadow: 3
-                                }}
-                            >
-                                {blog.imageUrl && (
-                                    <CardMedia
-                                        component="img"
-                                        height="180"
-                                        image={blog.imageUrl}
-                                        alt={blog.title}
-                                        sx={{ objectFit: 'cover' }}
-                                        onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x180/e2e8f0/475569?text=Blog+Image'; }}
-                                    />
-                                )}
-                                <CardContent sx={{ flexGrow: 1 }}>
-                                    <Typography gutterBottom variant="h6" component="div" sx={{ fontWeight: 'bold', lineHeight: 1.3 }}>
-                                        {blog.title}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, maxHeight: 60, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                                        {blog.content}
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto', pt: 1, borderTop: '1px solid #eee' }}>
-                                        <Typography variant="caption" color="text.disabled" sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <AuthorIcon sx={{ fontSize: 'small', mr: 0.5 }} /> {blog.authorName || 'Unknown Author'}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.disabled" sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <DateIcon sx={{ fontSize: 'small', mr: 0.5 }} /> {formatDate(blog.createdAt)}
-                                        </Typography>
-                                    </Box>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                    ))
-                )}
-            </Grid>
+            {/* Main Content */}
+            <div 
+              className="prose prose-lg dark:prose-invert max-w-none prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-headings:text-slate-900 dark:prose-headings:text-white prose-a:text-indigo-600 dark:prose-a:text-indigo-400"
+              // Using whitespace-pre-wrap to respect newlines from the database
+              style={{ whiteSpace: 'pre-wrap' }}
+            >
+              {blog.content}
+            </div>
 
-            {/* Load More Button & Loading Indicator for Pagination */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
-                {loading ? (
-                    <CircularProgress />
-                ) : hasMore ? (
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={() => fetchBlogs(false)} // Call fetchBlogs for next page
-                        disabled={loading}
-                    >
-                        Load More Blogs
-                    </Button>
-                ) : (
-                    blogs.length > 0 && ( // Only show this message if there are blogs already displayed
-                        <Typography variant="body1" color="text.secondary">You've reached the end of the blog posts!</Typography>
-                    )
-                )}
-            </Box>
-        </Box>
-    );
+            {/* Back Button */}
+            <div className="mt-12 text-center">
+                <button
+                    onClick={() => navigate('/blogs')}
+                    className="bg-indigo-600 text-white px-6 py-2 rounded-full font-semibold hover:bg-indigo-700 transition-colors"
+                >
+                    ← Back to All Blogs
+                </button>
+            </div>
+          </article>
+        )}
+      </main>
+    </div>
+  );
 };
 
-export default AllBlogsPage;
+export default BlogDetailPage;
