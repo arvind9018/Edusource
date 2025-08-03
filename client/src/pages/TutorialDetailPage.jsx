@@ -4,10 +4,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
     Box, Typography, CircularProgress, Alert, Paper, Link as MuiLink, Breadcrumbs,
-    List, ListItem, ListItemText, useMediaQuery, useTheme, Grid, IconButton
+    List, ListItem, ListItemText, useMediaQuery, useTheme, Grid, IconButton, Collapse
 } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import CodeIcon from '@mui/icons-material/Code';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { styled } from '@mui/system';
 
 // A helper component for the "Get Started" section with a dynamic title
 const GetStartedContent = ({ tutorialTitle }) => (
@@ -32,8 +34,17 @@ const GetStartedContent = ({ tutorialTitle }) => (
     </Box>
 );
 
+const ExpandMore = styled((props) => {
+  const { expand, ...other } = props;
+  return <IconButton {...other} />;
+})(({ expand }) => ({
+  transform: !expand ? 'rotate(0deg)' : 'rotate(180deg)',
+  marginLeft: 'auto',
+  transition: 'transform 0.3s ease', // Fixed the error by using a simple CSS transition
+}));
+
 // Sidebar content, extracted into its own component for clarity
-const SidebarContent = ({ tutorial, activeSubcategory, handleSubcategoryClick, handleToggle }) => (
+const SidebarContent = ({ tutorial, activeSubcategory, handleSubcategoryClick, handleToggle, expandedCategory, handleCategoryToggle }) => (
     <Box p={2}>
         <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, pt: 1, px: 1, color: 'primary.main' }}>
             {tutorial.title}
@@ -41,43 +52,66 @@ const SidebarContent = ({ tutorial, activeSubcategory, handleSubcategoryClick, h
         <List component="nav">
             {tutorial.categories.map((category, catIndex) => (
                 <Box key={catIndex}>
-                    <Typography
-                        variant="subtitle2"
-                        sx={{
-                            fontWeight: 'bold',
-                            color: 'text.secondary',
-                            textTransform: 'uppercase',
-                            my: 2,
-                            pl: 1
+                    <Box
+                        onClick={() => handleCategoryToggle(category.name)}
+                        sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            cursor: 'pointer',
+                            '&:hover': {
+                                backgroundColor: 'rgba(2, 136, 209, 0.03)',
+                                borderRadius: 1
+                            }
                         }}
                     >
-                        {category.name}
-                    </Typography>
-                    <List component="div" disablePadding>
-                        {category.subcategories.map((subcategory, subIndex) => (
-                            <ListItem
-                                key={subIndex}
-                                button
-                                onClick={() => {
-                                    handleSubcategoryClick(subcategory);
-                                    handleToggle();
-                                }}
-                                sx={{
-                                    mb: 0.5,
-                                    borderRadius: 1,
-                                    backgroundColor: activeSubcategory?.name === subcategory.name ? 'rgba(2, 136, 209, 0.05)' : 'transparent',
-                                    borderLeft: activeSubcategory?.name === subcategory.name ? '3px solid #0288d1' : 'none',
-                                    color: activeSubcategory?.name === subcategory.name ? 'primary.main' : 'text.primary',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(2, 136, 209, 0.03)',
-                                        color: 'primary.dark'
-                                    }
-                                }}
-                            >
-                                <ListItemText primary={subcategory.name} />
-                            </ListItem>
-                        ))}
-                    </List>
+                        <Typography
+                            variant="subtitle2"
+                            sx={{
+                                fontWeight: 'bold',
+                                color: 'text.secondary',
+                                textTransform: 'uppercase',
+                                my: 2,
+                                pl: 1,
+                                flexGrow: 1
+                            }}
+                        >
+                            {category.name}
+                        </Typography>
+                        <ExpandMore
+                            expand={expandedCategory === category.name}
+                            aria-expanded={expandedCategory === category.name}
+                            aria-label="show more"
+                        >
+                            <ExpandMoreIcon />
+                        </ExpandMore>
+                    </Box>
+                    <Collapse in={expandedCategory === category.name} timeout="auto" unmountOnExit>
+                        <List component="div" disablePadding>
+                            {category.subcategories.map((subcategory, subIndex) => (
+                                <ListItem
+                                    key={subIndex}
+                                    button
+                                    onClick={() => {
+                                        handleSubcategoryClick(subcategory);
+                                        handleToggle();
+                                    }}
+                                    sx={{
+                                        mb: 0.5,
+                                        borderRadius: 1,
+                                        backgroundColor: activeSubcategory?.name === subcategory.name ? 'rgba(2, 136, 209, 0.05)' : 'transparent',
+                                        borderLeft: activeSubcategory?.name === subcategory.name ? '3px solid #0288d1' : 'none',
+                                        color: activeSubcategory?.name === subcategory.name ? 'primary.main' : 'text.primary',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(2, 136, 209, 0.03)',
+                                            color: 'primary.dark'
+                                        }
+                                    }}
+                                >
+                                    <ListItemText primary={subcategory.name} />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Collapse>
                 </Box>
             ))}
         </List>
@@ -91,6 +125,7 @@ const TutorialDetailPage = () => {
     const [error, setError] = useState(null);
     const [activeSubcategory, setActiveSubcategory] = useState(null);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [expandedCategory, setExpandedCategory] = useState(null);
 
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -146,6 +181,10 @@ const TutorialDetailPage = () => {
     
     const handleToggleSidebar = () => {
         setMobileOpen(!mobileOpen);
+    };
+
+    const handleCategoryToggle = (categoryName) => {
+        setExpandedCategory(expandedCategory === categoryName ? null : categoryName);
     };
 
     if (loading) {
@@ -205,6 +244,8 @@ const TutorialDetailPage = () => {
                     activeSubcategory={activeSubcategory}
                     handleSubcategoryClick={handleSubcategoryClick}
                     handleToggle={handleToggleSidebar}
+                    expandedCategory={expandedCategory}
+                    handleCategoryToggle={handleCategoryToggle}
                 />
             </Box>
             
@@ -243,7 +284,6 @@ const TutorialDetailPage = () => {
                 sx={{
                     flexGrow: 1,
                     p: { xs: 2, md: 4 },
-                    // KEY CHANGE: Removed ml and used width with calc() for exact positioning on desktop
                     width: { md: `calc(100% - ${sidebarWidth}px)` },
                     backgroundColor: 'transparent',
                     transition: 'width 0.3s ease',
@@ -303,8 +343,8 @@ const TutorialDetailPage = () => {
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                                backdropFilter: 'blur(1px)',
+                                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                backdropFilter: 'blur(0.5px)',
                                 borderRadius: 2,
                                 zIndex: 0
                             }} />
@@ -323,7 +363,7 @@ const TutorialDetailPage = () => {
                                     {tutorial.title}
                                 </Typography>
                                 {tutorial.description && (
-                                    <Typography variant="h5" sx={{ maxWidth: 600, mx: 'auto', color: '#1a237e' }}>
+                                    <Typography variant="h6" sx={{ maxWidth: 600, mx: 'auto', color: 'text.secondary' }}>
                                         {tutorial.description}
                                     </Typography>
                                 )}
@@ -334,7 +374,8 @@ const TutorialDetailPage = () => {
                 )}
             </Box>
         </Box>
-    );
+    );
 };
 
 export default TutorialDetailPage;
+
