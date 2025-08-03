@@ -278,6 +278,7 @@ const Navbar = () => {
           <Link to="/hero-page" className="hover:text-indigo-600" onClick={() => setMobileMenuOpen(false)}>Home</Link>
           <Link to="/specializations" className="hover:text-indigo-600" onClick={() => setMobileMenuOpen(false)}>Specializations</Link>
           <Link to="/courses" className="hover:text-indigo-600" onClick={() => setMobileMenuOpen(false)}>Courses</Link>
+          <Link to="/tutorials" className="hover:text-indigo-600" onClick={() => setMobileMenuOpen(false)}>Tutorials</Link>
 
           {isLoggedIn ? (
             <>
@@ -292,5 +293,6 @@ const Navbar = () => {
     </nav>
   );
 };
+
 
 export default Navbar;
