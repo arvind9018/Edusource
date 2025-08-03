@@ -8,7 +8,7 @@ const SpecializationCard = ({ specialization }) => {
     <Link to={`/specialization/${specialization.id}`} style={{ textDecoration: 'none', height: '100%' }}>
       <Card
         sx={{
-          height: 400, // Fixed height for consistent card size
+          height: 400,
           display: 'flex',
           flexDirection: 'column',
           borderRadius: 3,
@@ -39,7 +39,7 @@ const SpecializationCard = ({ specialization }) => {
             borderTopRightRadius: 3,
           }}
         />
-        
+
         <CardContent
           sx={{
             flexGrow: 1,
@@ -62,13 +62,13 @@ const SpecializationCard = ({ specialization }) => {
                 sm: '1.1rem',
               },
               mb: 1,
-              color: '#1a237e', // deep blue
+              color: '#1a237e',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
-              minHeight: { // Enforce minimum height for two lines
+              minHeight: {
                 xs: '2.2rem',
                 sm: '2.5rem',
               }
@@ -92,13 +92,13 @@ const SpecializationCard = ({ specialization }) => {
               display: '-webkit-box',
               WebkitLineClamp: 3,
               WebkitBoxOrient: 'vertical',
-              minHeight: { // Enforce minimum height for three lines
+              minHeight: {
                 xs: '3.0rem',
                 sm: '3.5rem',
               }
             }}
           >
-            {specialization.shortDescription}
+            {specialization.description || specialization.shortDescription || 'No description available.'}
           </Typography>
 
           <Box
