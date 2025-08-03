@@ -4,7 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
     Box, Typography, CircularProgress, Alert, Paper, Link as MuiLink, Breadcrumbs,
-    List, ListItem, ListItemText, useMediaQuery, useTheme, Grid
+    List, ListItem, ListItemText, useMediaQuery, useTheme, Grid, IconButton
 } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import CodeIcon from '@mui/icons-material/Code';
@@ -32,15 +32,69 @@ const GetStartedContent = ({ tutorialTitle }) => (
     </Box>
 );
 
+// Sidebar content, extracted into its own component for clarity
+const SidebarContent = ({ tutorial, activeSubcategory, handleSubcategoryClick, handleToggle }) => (
+    <Box p={2}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, pt: 1, px: 1, color: 'primary.main' }}>
+            {tutorial.title}
+        </Typography>
+        <List component="nav">
+            {tutorial.categories.map((category, catIndex) => (
+                <Box key={catIndex}>
+                    <Typography
+                        variant="subtitle2"
+                        sx={{
+                            fontWeight: 'bold',
+                            color: 'text.secondary',
+                            textTransform: 'uppercase',
+                            my: 2,
+                            pl: 1
+                        }}
+                    >
+                        {category.name}
+                    </Typography>
+                    <List component="div" disablePadding>
+                        {category.subcategories.map((subcategory, subIndex) => (
+                            <ListItem
+                                key={subIndex}
+                                button
+                                onClick={() => {
+                                    handleSubcategoryClick(subcategory);
+                                    handleToggle();
+                                }}
+                                sx={{
+                                    mb: 0.5,
+                                    borderRadius: 1,
+                                    backgroundColor: activeSubcategory?.name === subcategory.name ? 'rgba(2, 136, 209, 0.05)' : 'transparent',
+                                    borderLeft: activeSubcategory?.name === subcategory.name ? '3px solid #0288d1' : 'none',
+                                    color: activeSubcategory?.name === subcategory.name ? 'primary.main' : 'text.primary',
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(2, 136, 209, 0.03)',
+                                        color: 'primary.dark'
+                                    }
+                                }}
+                            >
+                                <ListItemText primary={subcategory.name} />
+                            </ListItem>
+                        ))}
+                    </List>
+                </Box>
+            ))}
+        </List>
+    </Box>
+);
+
 const TutorialDetailPage = () => {
     const { tutorialId } = useParams();
     const [tutorial, setTutorial] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeSubcategory, setActiveSubcategory] = useState(null);
+    const [mobileOpen, setMobileOpen] = useState(false);
 
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const sidebarWidth = 250;
 
     const fetchTutorial = useCallback(async () => {
         setLoading(true);
@@ -82,13 +136,16 @@ const TutorialDetailPage = () => {
         fetchTutorial();
     }, [fetchTutorial]);
 
-    // Handle a click on a subcategory in the sidebar
     const handleSubcategoryClick = (subcategory) => {
         setActiveSubcategory(subcategory);
         window.scrollTo({
             top: 0,
             behavior: 'smooth'
         });
+    };
+    
+    const handleToggleSidebar = () => {
+        setMobileOpen(!mobileOpen);
     };
 
     if (loading) {
@@ -115,8 +172,6 @@ const TutorialDetailPage = () => {
         return null;
     }
 
-    const sidebarWidth = 250;
-
     return (
         <Box sx={{
             display: 'flex',
@@ -129,10 +184,11 @@ const TutorialDetailPage = () => {
             <Box
                 component="aside"
                 sx={{
-                    width: sidebarWidth,
+                    width: isMobile && !mobileOpen ? 0 : sidebarWidth,
                     flexShrink: 0,
-                    position: 'sticky',
+                    position: isMobile ? 'fixed' : 'sticky',
                     top: 0,
+                    left: isMobile && !mobileOpen ? -sidebarWidth : 0,
                     height: '100vh',
                     overflowY: 'auto',
                     backgroundColor: '#ffffff',
@@ -140,62 +196,57 @@ const TutorialDetailPage = () => {
                     borderRight: '1px solid #e0e0e0',
                     p: 2,
                     zIndex: 10,
+                    transition: 'width 0.3s ease, left 0.3s ease',
+                    display: { xs: mobileOpen ? 'block' : 'none', md: 'block' }
                 }}
             >
-                <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 3, pt: 1, px: 1, color: 'primary.main' }}>
-                    {tutorial.title}
-                </Typography>
-                <List component="nav">
-                    {tutorial.categories.map((category, catIndex) => (
-                        <Box key={catIndex}>
-                            <Typography
-                                variant="subtitle2"
-                                sx={{
-                                    fontWeight: 'bold',
-                                    color: 'text.secondary',
-                                    textTransform: 'uppercase',
-                                    my: 2,
-                                    pl: 1
-                                }}
-                            >
-                                {category.name}
-                            </Typography>
-                            <List component="div" disablePadding>
-                                {category.subcategories.map((subcategory, subIndex) => (
-                                    <ListItem
-                                        key={subIndex}
-                                        button
-                                        onClick={() => handleSubcategoryClick(subcategory)}
-                                        sx={{
-                                            mb: 0.5,
-                                            borderRadius: 1,
-                                            backgroundColor: activeSubcategory?.name === subcategory.name ? 'rgba(2, 136, 209, 0.05)' : 'transparent',
-                                            borderLeft: activeSubcategory?.name === subcategory.name ? '3px solid #0288d1' : 'none',
-                                            color: activeSubcategory?.name === subcategory.name ? 'primary.main' : 'text.primary',
-                                            '&:hover': {
-                                                backgroundColor: 'rgba(2, 136, 209, 0.03)',
-                                                color: 'primary.dark'
-                                            }
-                                        }}
-                                    >
-                                        <ListItemText primary={subcategory.name} />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Box>
-                    ))}
-                </List>
+                 <SidebarContent
+                    tutorial={tutorial}
+                    activeSubcategory={activeSubcategory}
+                    handleSubcategoryClick={handleSubcategoryClick}
+                    handleToggle={handleToggleSidebar}
+                />
             </Box>
+            
+            {/* Mobile Toggle Handle */}
+            {isMobile && !mobileOpen && (
+                <Box
+                    onClick={handleToggleSidebar}
+                    sx={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: 0,
+                        transform: 'translateY(-50%)',
+                        width: '20px',
+                        height: '100px',
+                        backgroundColor: 'primary.main',
+                        borderRadius: '0 8px 8px 0',
+                        cursor: 'pointer',
+                        zIndex: 11,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        boxShadow: '2px 0 5px rgba(0,0,0,0.2)',
+                    }}
+                >
+                    <Typography variant="body2" sx={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+                        Menu
+                    </Typography>
+                </Box>
+            )}
 
             {/* Main Content Area */}
             <Box
                 component="main"
+                onClick={isMobile && mobileOpen ? handleToggleSidebar : undefined}
                 sx={{
                     flexGrow: 1,
                     p: { xs: 2, md: 4 },
-                    width: `calc(100% - ${sidebarWidth}px)`,
-                    ml: { md: 0 },
+                    // KEY CHANGE: Removed ml and used width with calc() for exact positioning on desktop
+                    width: { md: `calc(100% - ${sidebarWidth}px)` },
                     backgroundColor: 'transparent',
+                    transition: 'width 0.3s ease',
                 }}
             >
                 <Box>
@@ -212,7 +263,6 @@ const TutorialDetailPage = () => {
                     </Breadcrumbs>
                 </Box>
                 
-                {/* Conditional rendering for hero section and content */}
                 {activeSubcategory ? (
                     <Box>
                         <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 3 }}>
@@ -253,8 +303,8 @@ const TutorialDetailPage = () => {
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                backgroundColor: 'rgba(255, 255, 255, 0.4)',
-                                backdropFilter: 'blur(0.5px)',
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                backdropFilter: 'blur(1px)',
                                 borderRadius: 2,
                                 zIndex: 0
                             }} />
@@ -268,21 +318,12 @@ const TutorialDetailPage = () => {
                                         background: 'linear-gradient(90deg, #0288d1, #26c6da)',
                                         WebkitBackgroundClip: 'text',
                                         WebkitTextFillColor: 'transparent',
-                                        textShadow: '0 0 5px rgba(0, 0, 0, 0.7)' // Added text shadow for readability
                                     }}
                                 >
                                     {tutorial.title}
                                 </Typography>
                                 {tutorial.description && (
-                                    <Typography
-                                        variant="h6"
-                                        sx={{
-                                            maxWidth: 600,
-                                            mx: 'auto',
-                                            color: 'text.secondary',
-                                            textShadow: '0 0 5px rgba(0, 0, 0, 0.7)' // Added text shadow for readability
-                                        }}
-                                    >
+                                    <Typography variant="h5" sx={{ maxWidth: 600, mx: 'auto', color: '#1a237e' }}>
                                         {tutorial.description}
                                     </Typography>
                                 )}
