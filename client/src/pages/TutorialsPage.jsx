@@ -64,7 +64,7 @@ const TutorialsPage = () => {
     };
 
     const cardStyles = {
-        height: 450, // Fixed height for a consistent card size
+        height: '100%', // Use 100% height to make all cards in a row equal height
         display: 'flex',
         flexDirection: 'column',
         textDecoration: 'none',
@@ -81,7 +81,7 @@ const TutorialsPage = () => {
 
     const cardMediaStyles = {
         height: 200,
-        objectFit: 'cover', // Ensures images are consistently sized without stretching
+        objectFit: 'cover',
     };
 
     const cardContentStyles = {
@@ -148,11 +148,17 @@ const TutorialsPage = () => {
                             sx={{
                                 maxWidth: 1200,
                                 mx: 'auto',
-                                justifyContent: currentTutorials.length > 0 && currentTutorials.length < 4 ? 'center' : 'flex-start',
                             }}
                         >
                             {currentTutorials.map((tutorial) => (
-                                <Grid item key={tutorial.id} xs={12} sm={6} md={3}>
+                                <Grid 
+                                    item 
+                                    key={tutorial.id} 
+                                    xs={12} 
+                                    sm={6} 
+                                    md={4} // Changed from 3 to 4 to give more space for the cards on desktop
+                                    lg={3}
+                                >
                                     <Card
                                         component={Link}
                                         to={`/tutorial/${tutorial.id}`}
@@ -172,7 +178,7 @@ const TutorialsPage = () => {
                                                 sx={{ 
                                                     fontWeight: 'bold', 
                                                     mb: 1, 
-                                                    color: '#1a237e' // Changed title text color to blue
+                                                    color: 'primary.main',
                                                 }}
                                             >
                                                 {tutorial.title}
