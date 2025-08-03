@@ -1,7 +1,6 @@
-// src/components/InstructorDashboard/InstructorCourseForm.jsx
 import React, { useState, useEffect } from 'react';
 import {
-    collection, addDoc, updateDoc, doc, getDocs, query, where, arrayUnion, arrayRemove, getDoc
+    collection, addDoc, updateDoc, doc, getDocs, query, where, getDoc, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { uploadImageToCloudinary } from '../../utils/cloudinary';
@@ -15,18 +14,48 @@ import {
     RemoveCircleOutline as RemoveIcon
 } from '@mui/icons-material';
 
-// Predefined list of specializations
+// Predefined list of specializations with descriptions
 const PREDEFINED_SPECIALIZATIONS = [
-    'Data Science',
-    'Machine Learning',
-    'Web Development',
-    'Mobile Development',
-    'Cloud Computing',
-    'Cybersecurity',
-    'Game Development',
-    'Digital Marketing',
-    'UI/UX Design',
-    'Artificial Intelligence'
+    {
+        name: 'Data Science',
+        shortDescription: 'Learn to analyze data, build models, and make data-driven decisions using Python and R.',
+    },
+    {
+        name: 'Machine Learning',
+        shortDescription: 'Master the algorithms and techniques to build intelligent applications and systems.',
+    },
+    {
+        name: 'Web Development',
+        shortDescription: 'Build modern and responsive web applications with front-end and back-end technologies.',
+    },
+    {
+        name: 'Mobile Development',
+        shortDescription: 'Create high-performance mobile apps for iOS and Android using frameworks like React Native and Flutter.',
+    },
+    {
+        name: 'Cloud Computing',
+        shortDescription: 'Manage and deploy applications on leading cloud platforms like AWS, Azure, and Google Cloud.',
+    },
+    {
+        name: 'Cybersecurity',
+        shortDescription: 'Protect systems and networks from digital attacks and threats with practical security skills.',
+    },
+    {
+        name: 'Game Development',
+        shortDescription: 'Develop interactive games using popular engines like Unity and Unreal Engine.',
+    },
+    {
+        name: 'Digital Marketing',
+        shortDescription: 'Drive business growth with courses on SEO, social media marketing, and content strategy.',
+    },
+    {
+        name: 'UI/UX Design',
+        shortDescription: 'Design intuitive and engaging user interfaces and user experiences for websites and apps.',
+    },
+    {
+        name: 'Artificial Intelligence',
+        shortDescription: 'Explore the foundations of AI and its applications in various industries.',
+    },
 ];
 
 const InstructorCourseForm = ({
@@ -41,7 +70,6 @@ const InstructorCourseForm = ({
         specialization: '',
         duration: '',
         bannerImage: '',
-        // Initialize with a default lecture entry
         lectures: [{ title: '', videoUrl: '', notesUrl: '' }],
     });
     const [bannerImageFile, setBannerImageFile] = useState(null);
@@ -49,7 +77,6 @@ const InstructorCourseForm = ({
     const [previewImageUrl, setPreviewImageUrl] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Populate form for editing
     useEffect(() => {
         if (selectedCourseForEdit) {
             setCourse(selectedCourseForEdit);
@@ -64,13 +91,12 @@ const InstructorCourseForm = ({
                 specialization: '',
                 duration: '',
                 bannerImage: '',
-                lectures: [{ title: '', videoUrl: '', notesUrl: '' }], // Reset lectures
+                lectures: [{ title: '', videoUrl: '', notesUrl: '' }],
             });
             setPreviewImageUrl(null);
         }
     }, [selectedCourseForEdit]);
 
-    // Handle image preview
     useEffect(() => {
         if (bannerImageFile) {
             const objectUrl = URL.createObjectURL(bannerImageFile);
@@ -190,12 +216,12 @@ const InstructorCourseForm = ({
         let courseId = selectedCourseForEdit?.id;
 
         try {
-            // If specialization is changed, remove the course from the old one first
+            // If the specialization is changing, remove the course from the old one first
             if (selectedCourseForEdit && selectedCourseForEdit.specialization !== courseData.specialization) {
                 await removeCourseFromSpecialization(selectedCourseForEdit.id, selectedCourseForEdit.specialization);
             }
 
-            // Save the course document and get its ID
+            // Add or update the main course document
             if (selectedCourseForEdit) {
                 await updateDoc(doc(db, 'courses', selectedCourseForEdit.id), courseData);
                 courseId = selectedCourseForEdit.id;
@@ -213,7 +239,7 @@ const InstructorCourseForm = ({
                 bannerImage: courseData.bannerImage,
             };
 
-            // Now, add or update the course within the specialization document
+            // Update the specialization document with the new course details
             await updateSpecializationWithDetails(courseDetails, courseData.specialization);
 
             onCourseSaved({ ...courseData, id: courseId });
@@ -227,6 +253,7 @@ const InstructorCourseForm = ({
         }
     };
 
+    // New logic for removing a course and checking if specialization is now empty
     const removeCourseFromSpecialization = async (courseId, specializationName) => {
         try {
             if (!specializationName) return;
@@ -237,18 +264,20 @@ const InstructorCourseForm = ({
 
             if (!querySnapshot.empty) {
                 const specializationDocRef = doc(db, 'specializations', querySnapshot.docs[0].id);
-                const oldCourseData = await getDoc(doc(db, 'courses', courseId));
-                if (oldCourseData.exists()) {
-                    const oldCourseDetails = {
-                        id: courseId,
-                        title: oldCourseData.data().title,
-                        shortDescription: oldCourseData.data().shortDescription,
-                        authorName: oldCourseData.data().authorName,
-                        bannerImage: oldCourseData.data().bannerImage,
-                    };
+                const specializationData = querySnapshot.docs[0].data();
+                const existingCourses = specializationData.courses || [];
+                
+                // Filter out the course to be removed
+                const updatedCourses = existingCourses.filter(c => c.id !== courseId);
 
+                // If this was the last course, delete the specialization document entirely
+                if (updatedCourses.length === 0) {
+                    await deleteDoc(specializationDocRef);
+                    onSuccess(`Specialization "${specializationName}" removed as it no longer contains any courses.`);
+                } else {
+                    // Otherwise, just update the courses array
                     await updateDoc(specializationDocRef, {
-                        courses: arrayRemove(oldCourseDetails),
+                        courses: updatedCourses,
                     });
                 }
             }
@@ -258,44 +287,41 @@ const InstructorCourseForm = ({
         }
     };
 
-    // This is the core function where the array logic is fixed
     const updateSpecializationWithDetails = async (courseDetails, specializationName) => {
         try {
             const specializationsRef = collection(db, 'specializations');
             const q = query(specializationsRef, where('name', '==', specializationName));
             const querySnapshot = await getDocs(q);
+            
+            const specializationDetails = PREDEFINED_SPECIALIZATIONS.find(
+                (spec) => spec.name === specializationName
+            );
 
             if (querySnapshot.empty) {
-                // If specialization doesn't exist, create it with the new course
                 await addDoc(specializationsRef, {
                     name: specializationName,
-                    courses: [courseDetails], // Start a new array with the course
+                    shortDescription: specializationDetails?.shortDescription || '',
+                    courses: [courseDetails],
                 });
             } else {
-                // If specialization exists, get the document reference
                 const specializationDocRef = doc(db, 'specializations', querySnapshot.docs[0].id);
-
-                // Fetch the existing courses array to check for an existing entry
                 const existingCoursesArray = querySnapshot.docs[0].data().courses || [];
-
-                // Find and remove the old version of the course from the array
+                
                 const updatedCoursesArray = existingCoursesArray.filter(c => c.id !== courseDetails.id);
-
-                // Add the new/updated course details to the array
+                
                 updatedCoursesArray.push(courseDetails);
 
-                // Update the document with the new array
                 await updateDoc(specializationDocRef, {
+                    shortDescription: specializationDetails?.shortDescription || '',
                     courses: updatedCoursesArray,
                 });
             }
         } catch (error) {
             console.error("Error updating specialization:", error);
             onError("Failed to update specialization with the new course. Please check Firestore.");
-            throw error; // Re-throw the error to be caught by the main handler
+            throw error;
         }
     };
-
 
     return (
         <Paper elevation={3} sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
@@ -370,8 +396,8 @@ const InstructorCourseForm = ({
                             required
                         >
                             {PREDEFINED_SPECIALIZATIONS.map((option) => (
-                                <MenuItem key={option} value={option}>
-                                    {option}
+                                <MenuItem key={option.name} value={option.name}>
+                                    {option.name}
                                 </MenuItem>
                             ))}
                         </TextField>
