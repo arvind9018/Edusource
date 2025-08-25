@@ -5,7 +5,7 @@ import { useCourse } from '../context/CourseContext';
 import usedRazorpay from '../hooks/useRazorpay';
 
 // IMPORTANT: Replace with the actual URL of your deployed external serverless function
-const RAZORPAY_BACKEND_ENDPOINT = 'https://edusource-backend-production-f06d.up.railway.app/api/razorpay'; // Use your local dev server for testing
+const RAZORPAY_BACKEND_ENDPOINT = 'https://edusource-backend-4.onrender.com/api/razorpay'; // Use your local dev server for testing
 // const RAZORPAY_BACKEND_ENDPOINT = 'https://your-deployed-serverless-url/api/razorpay'; // For deployment
 
 
@@ -187,3 +187,4 @@ const RazorpayCheckoutButton = ({ course, onPaymentSuccess }) => {
 };
 
 export default RazorpayCheckoutButton;
+
